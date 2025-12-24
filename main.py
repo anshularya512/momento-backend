@@ -79,3 +79,10 @@ from simulation import simulate_30_days
 @app.get("/simulate/{user_id}")
 def simulate(user_id: str, db: Session = Depends(get_db)):
     return simulate_30_days(user_id, db)
+
+
+from risk import detect_risk
+
+@app.get("/risk/{user_id}")
+def risk(user_id: str, db: Session = Depends(get_db)):
+    return detect_risk(user_id, db)
