@@ -1,14 +1,26 @@
-# main.py
-from fastapi import FastAPI
-from db import engine
-from models import Base
+from fastapi import Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from db import SessionLocal
+from models import Transaction
 
-app = FastAPI()
+class TxnIn(BaseModel):
+    user_id: str
+    amount: float
+    type: str
+    raw: str
+    timestamp: int
 
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@app.get("/")
-def health():
-    return {"status": "backend live"}
+@app.post("/transactions")
+def ingest(txn: TxnIn, db: Session = Depends(get_db)):
+    t = Transaction(**txn.dict())
+    db.add(t)
+    db.commit()
+    return {"ok": True}
