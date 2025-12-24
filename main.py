@@ -86,3 +86,10 @@ from risk import detect_risk
 @app.get("/risk/{user_id}")
 def risk(user_id: str, db: Session = Depends(get_db)):
     return detect_risk(user_id, db)
+
+
+from actions import suggest_action
+
+@app.get("/action/{user_id}")
+def action(user_id: str, db: Session = Depends(get_db)):
+    return suggest_action(user_id, db)
