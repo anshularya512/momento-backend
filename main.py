@@ -74,3 +74,8 @@ def ingest(txn: TxnIn, db: Session = Depends(get_db)):
     detect_subscriptions(txn.user_id, db)
 
     return {"ok": True}
+from simulation import simulate_30_days
+
+@app.get("/simulate/{user_id}")
+def simulate(user_id: str, db: Session = Depends(get_db)):
+    return simulate_30_days(user_id, db)
