@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from models_extra import RecurringTransaction, IncomeSource
+from models_extra import DeviceToken
 
 from db import SessionLocal, engine
 from models import Base, Transaction
@@ -93,3 +94,17 @@ from actions import suggest_action
 @app.get("/action/{user_id}")
 def action(user_id: str, db: Session = Depends(get_db)):
     return suggest_action(user_id, db)
+class TokenIn(BaseModel):
+    user_id: str
+    token: str
+@app.post("/register-token")
+def register_token(data: TokenIn, db: Session = Depends(get_db)):
+    exists = db.query(DeviceToken).filter(
+        DeviceToken.token == data.token
+    ).first()
+
+    if not exists:
+        db.add(DeviceToken(**data.dict()))
+        db.commit()
+
+    return {"ok": True}
