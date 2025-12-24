@@ -61,3 +61,16 @@ def list_txns(db: Session = Depends(get_db)):
         }
         for t in txns
     ]
+
+from detectors import detect_salary, detect_subscriptions
+
+@app.post("/transactions")
+def ingest(txn: TxnIn, db: Session = Depends(get_db)):
+    t = Transaction(**txn.dict())
+    db.add(t)
+    db.commit()
+
+    detect_salary(txn.user_id, db)
+    detect_subscriptions(txn.user_id, db)
+
+    return {"ok": True}
