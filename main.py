@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from models_extra import RecurringTransaction, IncomeSource
 
 from db import SessionLocal, engine
 from models import Base, Transaction
@@ -47,3 +48,16 @@ def ingest(txn: TxnIn, db: Session = Depends(get_db)):
     db.add(t)
     db.commit()
     return {"ok": True}
+@app.get("/debug/transactions")
+def list_txns(db: Session = Depends(get_db)):
+    txns = db.query(Transaction).all()
+    return [
+        {
+            "user_id": t.user_id,
+            "amount": t.amount,
+            "type": t.type,
+            "raw": t.raw,
+            "timestamp": t.timestamp
+        }
+        for t in txns
+    ]
