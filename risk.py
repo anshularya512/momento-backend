@@ -1,43 +1,26 @@
-# forely/risk.py
 from simulation import simulate_30_days
-
-def compute_spending_behavior(transactions):
-    """Calculates average daily burn rate from history."""
-    daily = {}
-    for tx in transactions:
-        if tx.type != "debit": continue
-        day = tx.timestamp # assuming this is already a date object or handled
-        daily[day] = daily.get(day, 0) + tx.amount
-    
-    if not daily:
-        return {"avg_daily": 0, "volatility": 0}
-    
-    values = list(daily.values())
-    return {
-        "avg_daily": sum(values) / len(values),
-        "volatility": max(values) - min(values)
-    }
 
 def detect_risk(user_id: str, db, buffer_limit=500.0):
     simulation = simulate_30_days(user_id, db)
     if not simulation:
-        return {"risk": False}
+        return {"status": "safe", "message": "No data found."}
 
     current_balance = simulation[0]["balance"]
-    if current_balance < buffer_limit:
+    
+    # Logic: Warning if current balance is below $500 
+    # OR if the lowest point in the next 30 days is below $500
+    min_future_balance = min([day["balance"] for day in simulation])
+
+    if current_balance < buffer_limit or min_future_balance < buffer_limit:
         return {
-            "risk": True,
-            "days_left": 0,
-            "cause": "Low Buffer Zone",
-            "message": f"Your balance (${current_balance}) is below your $500 safety buffer."
+            "status": "warning",
+            "current_balance": current_balance,
+            "min_forecasted": min_future_balance,
+            "message": f"Cash Stress! Balance will drop to ${min_future_balance}."
         }
 
-    for day_data in simulation:
-        if day_data["balance"] < buffer_limit:
-            return {
-                "risk": True,
-                "days_left": day_data["day"],
-                "cause": "Buffer Breach",
-                "message": f"Upcoming costs will breach your safety buffer in {day_data['day']} days."
-            }
-    return {"risk": False}
+    return {
+        "status": "safe",
+        "current_balance": current_balance,
+        "message": "Your cash flow looks healthy for the next 30 days."
+    }

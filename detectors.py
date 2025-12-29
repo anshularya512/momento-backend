@@ -1,44 +1,41 @@
 from sqlalchemy.orm import Session
 from models import Transaction
 from models_extra import IncomeSource, RecurringTransaction
+from collections import defaultdict
 
-def detect_salary(user_id: str, db: Session):
-    # Detect salary if 'salary' appears in the raw text
-    salary_tx = db.query(Transaction).filter(
-        Transaction.user_id == user_id,
-        Transaction.raw.ilike("%salary%")
-    ).first()
+def detect_recurring_patterns(user_id: str, db: Session):
+    # Fetch all transactions for this user
+    txns = db.query(Transaction).filter(Transaction.user_id == user_id).all()
     
-    if salary_tx:
-        # Check if already exists to avoid duplicates
-        exists = db.query(IncomeSource).filter(IncomeSource.user_id == user_id).first()
-        if not exists:
-            income = IncomeSource(user_id=user_id, amount=salary_tx.amount, interval_days=30, confidence=1.0)
-            db.add(income)
-            db.commit()
-
-def detect_subscriptions(user_id: str, db: Session):
-    # Detect Rent and common subs immediately
-    keywords = ["rent", "netflix", "spotify", "gym", "prime", "apple", "google"]
-    txns = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.type == "debit").all()
+    # Map to track frequency of similar transactions
+    patterns = defaultdict(list)
     
     for tx in txns:
-        for kw in keywords:
-            if kw in tx.raw.lower():
-                # Check if this specific merchant is already tracked
+        # Group by a simplified merchant name and amount
+        # This helps identify Rent or Salary even if the date varies slightly
+        key = f"{tx.type}_{tx.amount}"
+        patterns[key].append(tx)
+
+    for key, items in patterns.items():
+        if len(items) >= 1: # MVP: Treat even single large entries as patterns
+            tx = items[0]
+            if tx.type == "credit":
+                # Save as an Income Source
+                exists = db.query(IncomeSource).filter(IncomeSource.user_id == user_id).first()
+                if not exists:
+                    db.add(IncomeSource(user_id=user_id, amount=tx.amount, interval_days=30))
+            else:
+                # Save as a Recurring Expense
                 exists = db.query(RecurringTransaction).filter(
                     RecurringTransaction.user_id == user_id, 
-                    RecurringTransaction.merchant.ilike(f"%{kw}%")
+                    RecurringTransaction.amount == tx.amount
                 ).first()
-                
                 if not exists:
-                    rec = RecurringTransaction(
+                    db.add(RecurringTransaction(
                         user_id=user_id,
-                        merchant=kw.capitalize(),
+                        merchant=tx.raw[:20], # Use start of raw text as merchant name
                         amount=tx.amount,
                         interval_days=30,
-                        type="debit",
-                        confidence=0.9
-                    )
-                    db.add(rec)
+                        type="debit"
+                    ))
     db.commit()
