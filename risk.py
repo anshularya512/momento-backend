@@ -1,26 +1,38 @@
 from simulation import simulate_30_days
 
+def compute_spending_behavior(transactions):
+    """Calculates average daily burn rate from history."""
+    daily = {}
+    for tx in transactions:
+        if tx.type != "debit": continue
+        # Use date as key
+        d = tx.timestamp.date() if hasattr(tx.timestamp, 'date') else str(tx.timestamp)[:10]
+        daily[d] = daily.get(d, 0) + tx.amount
+    
+    if not daily:
+        return {"avg_daily": 0, "volatility": 0}
+    
+    values = list(daily.values())
+    return {
+        "avg_daily": sum(values) / len(values),
+        "volatility": max(values) - min(values) if len(values) > 1 else 0
+    }
+
 def detect_risk(user_id: str, db, buffer_limit=500.0):
     simulation = simulate_30_days(user_id, db)
     if not simulation:
-        return {"status": "safe", "message": "No data found."}
+        return {"risk": False, "status": "safe"}
 
     current_balance = simulation[0]["balance"]
     
-    # Logic: Warning if current balance is below $500 
-    # OR if the lowest point in the next 30 days is below $500
-    min_future_balance = min([day["balance"] for day in simulation])
+    # Check for buffer breach
+    for day_data in simulation:
+        if day_data["balance"] < buffer_limit:
+            return {
+                "risk": True,
+                "status": "warning",
+                "days_left": day_data["day"],
+                "message": f"Balance will drop below ${buffer_limit} buffer."
+            }
 
-    if current_balance < buffer_limit or min_future_balance < buffer_limit:
-        return {
-            "status": "warning",
-            "current_balance": current_balance,
-            "min_forecasted": min_future_balance,
-            "message": f"Cash Stress! Balance will drop to ${min_future_balance}."
-        }
-
-    return {
-        "status": "safe",
-        "current_balance": current_balance,
-        "message": "Your cash flow looks healthy for the next 30 days."
-    }
+    return {"risk": False, "status": "safe"}
