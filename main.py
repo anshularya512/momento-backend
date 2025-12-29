@@ -72,3 +72,9 @@ def get_forecast(user_id: str, db: Session = Depends(get_db)):
 @app.get("/simulate/{user_id}")
 def get_simulation(user_id: str, db: Session = Depends(get_db)):
     return simulate_30_days(user_id, db)
+
+
+
+@app.get("/risk/{user_id}")
+def risk(user_id: str, db: Session = Depends(get_db)): # Changed int to str
+    return detect_risk(user_id, db)
