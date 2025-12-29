@@ -32,3 +32,16 @@ class DeviceToken(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(String, index=True)
     token = Column(String, unique=True)
+
+
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
+class BulkTransaction(BaseModel):
+    user_id: int
+    timestamp: datetime
+    amount: float
+    type: str  # "debit" | "credit"
+    source: Optional[str] = "statement"
+    raw: Optional[str] = None

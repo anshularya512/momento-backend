@@ -78,3 +78,20 @@ def simulate_30_days(user_id: str, db: Session):
     return simulation
 
 
+
+def forecast_cash_window(balance, avg_daily, volatility):
+    if avg_daily == 0:
+        return {
+            "range_days": [30, 45],
+            "confidence": 0.9,
+            "state": "safe"
+        }
+
+    lower = int(balance / (avg_daily + volatility * 0.3))
+    upper = int(balance / max(avg_daily - volatility * 0.3, 1))
+
+    return {
+        "range_days": [max(lower, 1), max(upper, lower + 3)],
+        "confidence": 0.75,
+        "state": "warning" if lower < 10 else "stable"
+    }

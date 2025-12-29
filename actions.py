@@ -63,3 +63,42 @@ def suggest_action(user_id: str, db):
         "action": "warn",
         "message": "Spending may need adjustment"
     }
+
+
+import re
+from datetime import datetime
+
+def parse_statement_text(text: str):
+    """
+    Very forgiving parser for copied bank / UPI statements
+    """
+    rows = []
+    lines = text.split("\n")
+
+    for line in lines:
+        # Example patterns: 12/06/2025 UPI ZOMATO -250
+        match = re.search(
+            r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}).*(\-?\d+\.?\d*)",
+            line
+        )
+        if not match:
+            continue
+
+        date_str, amount = match.groups()
+
+        try:
+            timestamp = datetime.strptime(date_str, "%d/%m/%Y")
+        except:
+            continue
+
+        amount = float(amount)
+        tx_type = "debit" if amount < 0 else "credit"
+
+        rows.append({
+            "timestamp": timestamp,
+            "amount": abs(amount),
+            "type": tx_type,
+            "raw": line
+        })
+
+    return rows

@@ -6,6 +6,10 @@ from models_extra import DeviceToken
 
 from db import SessionLocal, engine
 from models import Base, Transaction
+from models_extra import BulkTransaction
+from actions import parse_statement_text
+from risk import compute_spending_behavior
+from simulation import forecast_cash_window
 
 
 # 1️⃣ CREATE APP FIRST
@@ -108,3 +112,55 @@ def register_token(data: TokenIn, db: Session = Depends(get_db)):
         db.commit()
 
     return {"ok": True}
+
+
+@app.post("/transactions/statement")
+def upload_statement(
+    user_id: int,
+    text: str,
+    db: Session = Depends(get_db)
+):
+    parsed = parse_statement_text(text)
+
+    for row in parsed:
+        tx = Transaction(
+            user_id=user_id,
+            timestamp=row["timestamp"],
+            amount=row["amount"],
+            type=row["type"],
+            raw=row["raw"]
+        )
+        db.add(tx)
+
+    db.commit()
+    return {"inserted": len(parsed)}
+
+
+@app.get("/analyze/statement")
+def analyze_statement(user_id: int, db: Session = Depends(get_db)):
+    txs = db.query(Transaction).filter(
+        Transaction.user_id == user_id
+    ).all()
+
+    behavior = compute_spending_behavior(txs)
+
+    balance = sum(
+        tx.amount if tx.type == "credit" else -tx.amount
+        for tx in txs
+    )
+
+    forecast = forecast_cash_window(
+        balance,
+        behavior["avg_daily"],
+        behavior["volatility"]
+    )
+
+    return {
+        "avg_daily_burn": behavior["avg_daily"],
+        "volatility": behavior["volatility"],
+        "balance_estimate": balance,
+        "forecast": forecast
+    }
+
+
+

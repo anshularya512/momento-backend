@@ -25,3 +25,26 @@ def detect_risk(user_id: str, db):
     return {
         "risk": False
     }
+
+
+def compute_spending_behavior(transactions):
+    daily = {}
+
+    for tx in transactions:
+        if tx.type != "debit":
+            continue
+        day = tx.timestamp.date()
+        daily[day] = daily.get(day, 0) + tx.amount
+
+    if not daily:
+        return {
+            "avg_daily": 0,
+            "volatility": 0
+        }
+
+    values = list(daily.values())
+
+    return {
+        "avg_daily": sum(values) / len(values),
+        "volatility": max(values) - min(values)
+    }
