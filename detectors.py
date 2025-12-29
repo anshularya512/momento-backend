@@ -1,19 +1,32 @@
 from sqlalchemy.orm import Session
-from models import Transaction
-from models_extra import IncomeSource, RecurringTransaction
+import models
+import models_extra
 
 def detect_recurring_patterns(user_id: str, db: Session):
-    # Get all history to learn behavior
-    txns = db.query(Transaction).filter(Transaction.user_id == user_id).all()
+    # Fetch all history for this user
+    txns = db.query(models.Transaction).filter(models.Transaction.user_id == user_id).all()
+    if not txns:
+        return
+
+    # 1. Identify Salary (Highest Credit)
+    credits = [t for t in txns if t.type == 'credit']
+    if credits:
+        top_income = max(credits, key=lambda x: x.amount)
+        # Check if already exists to avoid duplicates
+        if not db.query(models_extra.IncomeSource).filter_by(user_id=user_id).first():
+            db.add(models_extra.IncomeSource(user_id=user_id, amount=top_income.amount, interval_days=30))
+
+    # 2. Identify Major Bills (Debits > $500 like Rent)
+    debits = [t for t in txns if t.type == 'debit' and t.amount > 500]
+    for d in debits:
+        existing = db.query(models_extra.RecurringTransaction).filter_by(user_id=user_id, amount=d.amount).first()
+        if not existing:
+            db.add(models_extra.RecurringTransaction(
+                user_id=user_id,
+                merchant=d.raw[:20],
+                amount=d.amount,
+                interval_days=30,
+                type="debit"
+            ))
     
-    # Simple logic: If a high-value debit (>30% of total) appears, treat it as Rent/Major Bill
-    total_credit = sum([t.amount for t in txns if t.type == 'credit'])
-    
-    for tx in txns:
-        if tx.type == 'credit' and tx.amount > (total_credit * 0.5):
-            # Identified as primary Salary
-            db.add(IncomeSource(user_id=user_id, amount=tx.amount, interval_days=30))
-        elif tx.type == 'debit' and tx.amount > 500:
-            # Identified as a Major Recurring Cost (Rent/Mortgage)
-            db.add(RecurringTransaction(user_id=user_id, merchant=tx.raw[:15], amount=tx.amount, interval_days=30, type='debit'))
     db.commit()
