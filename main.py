@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from models_extra import RecurringTransaction, IncomeSource
 from models_extra import DeviceToken
+from db import engine, Base
+from fastapi.middleware.cors import CORSMiddleware
 
 from db import SessionLocal, engine
 from models import Base, Transaction
@@ -14,6 +16,14 @@ from simulation import forecast_cash_window
 
 # 1️⃣ CREATE APP FIRST
 app = FastAPI()
+Base.metadata.create_all(bind=engine)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # tighten later
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # 2️⃣ CREATE TABLES ON STARTUP
@@ -117,53 +127,49 @@ def register_token(data: TokenIn, db: Session = Depends(get_db)):
 from models_extra import StatementUpload
 
 @app.post("/transactions/statement")
-def upload_statement(
-    payload: StatementUpload,
-    db: Session = Depends(get_db)
-):
+def upload_statement(payload: StatementUpload, db: Session = Depends(get_db)):
     parsed = parse_statement_text(payload.text)
+
+    if not parsed:
+        return {"inserted": 0}
+
+    inserted = 0
 
     for row in parsed:
         tx = Transaction(
             user_id=payload.user_id,
             timestamp=row["timestamp"],
             amount=row["amount"],
-            type=row["type"],
-            raw=row["raw"]
+            type=row["type"]
         )
         db.add(tx)
+        inserted += 1
 
     db.commit()
-    return {"inserted": len(parsed)}
-
-    parsed = parse_statement_text(text)
-
-    for row in parsed:
-        tx = Transaction(
-            user_id=user_id,
-            timestamp=row["timestamp"],
-            amount=row["amount"],
-            type=row["type"],
-            raw=row["raw"]
-        )
-        db.add(tx)
-
-    db.commit()
-    return {"inserted": len(parsed)}
+    return {"inserted": inserted}
 
 
 @app.get("/analyze/statement")
 def analyze_statement(user_id: int, db: Session = Depends(get_db)):
-    txs = db.query(Transaction).filter(
-        Transaction.user_id == user_id
-    ).all()
+    txs = db.query(Transaction).filter(Transaction.user_id == user_id).all()
+
+    if not txs:
+        return {
+            "avg_daily_burn": 0,
+            "volatility": 0,
+            "balance_estimate": 0,
+            "forecast": {
+                "range_days": [0, 0],
+                "confidence": 0,
+                "state": "no-data"
+            }
+        }
 
     behavior = compute_spending_behavior(txs)
 
-    balance = sum(
-        tx.amount if tx.type == "credit" else -tx.amount
-        for tx in txs
-    )
+    balance = 0
+    for tx in txs:
+        balance += tx.amount if tx.type == "credit" else -tx.amount
 
     forecast = forecast_cash_window(
         balance,
@@ -177,6 +183,7 @@ def analyze_statement(user_id: int, db: Session = Depends(get_db)):
         "balance_estimate": balance,
         "forecast": forecast
     }
+
 
 
 
