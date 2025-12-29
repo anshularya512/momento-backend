@@ -5,6 +5,8 @@ from models_extra import RecurringTransaction, IncomeSource
 from models_extra import DeviceToken
 from db import engine, Base
 from fastapi.middleware.cors import CORSMiddleware
+import traceback
+from fastapi.responses import PlainTextResponse
 
 from db import SessionLocal, engine
 from models import Base, Transaction
@@ -125,29 +127,30 @@ def register_token(data: TokenIn, db: Session = Depends(get_db)):
 
 
 from models_extra import StatementUpload
-
 @app.post("/transactions/statement")
 def upload_statement(payload: StatementUpload, db: Session = Depends(get_db)):
-    parsed = parse_statement_text(payload.text)
+    try:
+        parsed = parse_statement_text(payload.text)
 
-    if not parsed:
-        return {"inserted": 0}
+        inserted = 0
+        for row in parsed:
+            tx = Transaction(
+                user_id=payload.user_id,
+                timestamp=row["timestamp"],
+                amount=row["amount"],
+                type=row["type"]
+            )
+            db.add(tx)
+            inserted += 1
 
-    inserted = 0
+        db.commit()
+        return {"inserted": inserted}
 
-    for row in parsed:
-        tx = Transaction(
-            user_id=payload.user_id,
-            timestamp=row["timestamp"],
-            amount=row["amount"],
-            type=row["type"]
+    except Exception as e:
+        return PlainTextResponse(
+            traceback.format_exc(),
+            status_code=500
         )
-        db.add(tx)
-        inserted += 1
-
-    db.commit()
-    return {"inserted": inserted}
-
 
 @app.get("/analyze/statement")
 def analyze_statement(user_id: int, db: Session = Depends(get_db)):
