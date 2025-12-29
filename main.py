@@ -6,7 +6,7 @@ import time
 from db import SessionLocal, engine, Base
 import models, models_extra
 from actions import parse_statement_text, suggest_action
-from detectors import detect_salary, detect_subscriptions
+from detectors import detect_recurring_patterns
 from risk import compute_spending_behavior, detect_risk
 from simulation import simulate_30_days
 
