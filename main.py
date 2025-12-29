@@ -180,3 +180,26 @@ def analyze_statement(user_id: int, db: Session = Depends(get_db)):
 
 
 
+from models_extra import StatementUpload
+
+@app.post("/transactions/statement")
+def upload_statement(
+    payload: StatementUpload,
+    db: Session = Depends(get_db)
+):
+    parsed = parse_statement_text(payload.text)
+
+    if not parsed:
+        return {"inserted": 0}
+
+    for row in parsed:
+        tx = Transaction(
+            user_id=payload.user_id,
+            timestamp=row["timestamp"],
+            amount=row["amount"],
+            type=row["type"]
+        )
+        db.add(tx)
+
+    db.commit()
+    return {"inserted": len(parsed)}
