@@ -114,12 +114,28 @@ def register_token(data: TokenIn, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+from models_extra import StatementUpload
+
 @app.post("/transactions/statement")
 def upload_statement(
-    user_id: int,
-    text: str,
+    payload: StatementUpload,
     db: Session = Depends(get_db)
 ):
+    parsed = parse_statement_text(payload.text)
+
+    for row in parsed:
+        tx = Transaction(
+            user_id=payload.user_id,
+            timestamp=row["timestamp"],
+            amount=row["amount"],
+            type=row["type"],
+            raw=row["raw"]
+        )
+        db.add(tx)
+
+    db.commit()
+    return {"inserted": len(parsed)}
+
     parsed = parse_statement_text(text)
 
     for row in parsed:

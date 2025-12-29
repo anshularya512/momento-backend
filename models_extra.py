@@ -45,3 +45,8 @@ class BulkTransaction(BaseModel):
     type: str  # "debit" | "credit"
     source: Optional[str] = "statement"
     raw: Optional[str] = None
+
+
+class StatementUpload(BaseModel):
+    user_id: int
+    text: str
