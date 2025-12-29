@@ -78,3 +78,14 @@ def get_simulation(user_id: str, db: Session = Depends(get_db)):
 @app.get("/risk/{user_id}")
 def risk(user_id: str, db: Session = Depends(get_db)): # Changed int to str
     return detect_risk(user_id, db)
+
+
+
+from fastapi import UploadFile, File
+
+@app.post("/upload-file/{user_id}")
+async def upload_statement(user_id: str, file: UploadFile = File(...)):
+    # This prepares the app to take a CSV or PDF
+    contents = await file.read()
+    # Logic to parse CSV text into transactions would go here
+    return {"message": f"File {file.filename} received and queued for analysis"}
