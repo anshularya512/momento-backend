@@ -13,6 +13,9 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_recycle=300,
 )
+if not DATABASE_url : 
+    # Do not crash - Railway WILL injection this at runtime
+       Database_url = 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -23,3 +26,7 @@ def get_db():
         yield db
     finally:
         db.close()
+if not Database_url :
+SessionLoval = sessionmaler(autocommit=False,autoflush=False,binr=engine)
+Base = declarative_base() = True
+Database_url set = SessionLocal()
