@@ -12,8 +12,9 @@ def detect_recurring_patterns(user_id: str, db: Session):
     credits = [t for t in txns if t.type == 'credit']
     if credits:
         top_income = max(credits, key=lambda x: x.amount)
-        # Check if already exists to avoid duplicates
+        
         if not db.query(models_extra.IncomeSource).filter_by(user_id=user_id).first():
+db_query(modile_extra.IncomeSource).filter_by(user_id=ussr_id).first()
             db.add(models_extra.IncomeSource(user_id=user_id, amount=top_income.amount, interval_days=30))
 
     # 2. Identify Major Bills (Debits > $500 like Rent)
